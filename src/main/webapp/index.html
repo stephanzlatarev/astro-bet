@@ -6,163 +6,25 @@
     <script src="jquery-1.9.1.js"></script>
     <script src="jquery.flot.js"></script>
     <script src="jquery.flot.time.js"></script>
+    <script src="chart.all.js"></script>
+    <script src="chart.current.js"></script>
     <style type="text/css">
       html,body { height: 100%; margin: 0px; padding: 0px; overflow: hidden; }
-      #chart { height: 100% }
+      #chartall { height: 50% }
+      #chartcurrent { height: 50% }
     </style>
   </head>
 
 
-<script type="text/javascript">
-  var chart
-  var data
-
-  var grid = {
-    xStart: getWeekStart(),
-    xEnd: getWeekEnd()
-  }
-
-  var options = {
-    series: {
-      lines: { show: true },
-      points: { show: false }
-    },
-    xaxis : {
-      mode: 'time',
-      timeformat: "%H:%M %d.%m",
-      timezone: 'browser'
-    },
-    grid: {
-      markings: []
-    },
-    hooks: {
-      draw: function(plot, ctx) {
-        // draw trading hours (GMT):
-        // Sydney:   10:00 pm - 07:00 am
-        // Tokyo:    00:00 am - 09:00 am
-        // London:   08:00 am - 05:00 pm
-        // New York: 01:00 pm - 10:00 pm
-        for (var d = 1; d <= 5; d++) {
-          var londonOpen  = plot.pointOffset({ x: getTime(d,  8), y: grid.yMax })
-          var londonClose = plot.pointOffset({ x: getTime(d, 17), y: grid.yMin })
-          var newyorkOpen = plot.pointOffset({ x: getTime(d, 13), y: grid.yMax })
-          var newyorkClose = plot.pointOffset({ x: getTime(d, 22), y: grid.yMin })
-
-          ctx.beginPath();
-          ctx.rect(londonOpen.left, londonOpen.top, londonClose.left - londonOpen.left, londonClose.top - londonOpen.top);
-          ctx.stroke();
-          ctx.beginPath();
-          ctx.rect(newyorkOpen.left, newyorkOpen.top, newyorkClose.left - newyorkOpen.left, newyorkClose.top - newyorkOpen.top);
-          ctx.stroke();
-        }
-
-      }
-    }
-  }
-
-  function displayData() {
-    if (chart && data) {
-      calibrateChart()
-      calibrateGrid()
-      displayChart()
-    }
-  }
-
-  function calibrateChart() {
-    var tickSize = Math.ceil(5000 / $('#chart').innerWidth())
-    tickSize = Math.ceil(24 / Math.floor(24 / tickSize))
-    options.xaxis.tickSize = [ tickSize, 'hour']
-
-    options.xaxis.min = Math.floor(grid.xStart / 3600000) * 3600000;
-  }
-
-  function calibrateGrid() {
-    var floor = 0
-    var ceiling = 0
-    for (i in data) {
-      if ((grid.xStart <= data[i].time) && (data[i].time <= grid.xEnd)) {
-        floor = floor ? Math.min(floor, data[i].lowBid) : data[i].lowBid;
-        ceiling = ceiling ? Math.max(ceiling, data[i].highBid) : data[i].highBid;
-      }
-    }
-
-    grid.yMin = Math.floor(floor / 100) * 100 + 10
-    grid.yMax = Math.ceil(ceiling / 100) * 100 - 10
-    grid.yMid = (grid.yMin + grid.yMax) / 2
-  }
-
-  function displayChart() {
-    var plot = []
-    var series = []
-
-    for (var i in data) {
-      if ((grid.xStart <= data[i].time) && (data[i].time <= grid.xEnd)) {
-        series.push([ data[i].time, data[i].openBid ])
-        series.push([ data[i].time, data[i].highBid ])
-        series.push([ data[i].time, data[i].lowBid ])
-        series.push([ data[i].time, data[i].closeBid ])
-      }
-    }
-
-    plot.push({ data: series, color: 'green' });
-
-    // add current pips line
-    var pips = data[data.length - 1].closeBid
-    plot.push({ data: [ [ grid.xStart, pips ], [ grid.xEnd, pips ] ], color: 'blue' })
-
-    // draw
-    $("#chart").empty()
-      .plot(plot, options).data("plot");
-  }
-
-  function getTime(day, hour) {
-    var offset = - new Date().getTimezoneOffset()
-    var d = new Date()
-    d.setDate(d.getDate() - d.getDay() + day)
-    d.setHours(hour)
-    d.setMinutes(offset)
-    return d.getTime()
-  }
-
-  function getWeekStart() {
-    return getTime(0, 22)
-  }
-
-  function getWeekEnd() {
-    return getTime(5, 22)
-  }
-
-  //---------------------
-
-  $.ajax({
-    url: "/retrieve",
-    dataType: "json"
-  }).done(function(d) {
-    data = d
-    for (var i in data) {
-      data[i].time /= 1000
-      data[i].openBid *= 1000000
-      data[i].highBid *= 1000000
-      data[i].lowBid *= 1000000
-      data[i].closeBid *= 1000000
-    }
-
-    displayData()
-  });
-
-  $(document).ready(function() {
-    chart = "ready";
-    displayData();
-  });
-
-  $(window).resize(function() {
-    displayData();
-  });
-
-</script>
+  <script type="text/javascript">
+    $(document).ready(function() {
+      new AllChart($("#chartall"))
+      new CycleChart($("#chartcurrent"))
+    })
+  </script>
 
   <body>
-    <div id="chart">
-    </div>
+    <div id="chartall"></div>
+    <div id="chartcurrent"></div>
   </body>
 </html>

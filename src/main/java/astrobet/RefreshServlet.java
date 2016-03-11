@@ -24,19 +24,13 @@ public class RefreshServlet extends HttpServlet {
 
   @Override
   public void doGet(HttpServletRequest request, HttpServletResponse response) throws IOException {
-    final String QUOTES_URL = "https://api-fxpractice.oanda.com/v1/candles?instrument=EUR_USD&granularity=M1&count=1";
-
     try {
-      HttpURLConnection connection = (HttpURLConnection) new URL(QUOTES_URL).openConnection();
-      connection.setRequestMethod("GET");
-      connection.addRequestProperty("Content-Type", "application/x-www-form-urlencoded");
-      connection.addRequestProperty("X-Accept-Datetime-Format", "UNIX");
-      connection.addRequestProperty("Authorization", "Bearer 6fec4dc8bf5ed983d77b7783c027bdcd-d16c06e6db690a70916c04909fd51033");
+      String target = request.getParameter("window");
 
-      String candle = getJson(connection.getInputStream());
-
-      if (candle != null) {
-        updateData(candle);
+      if ("current".equals(target)) {
+        appendCandles(retrieveCandles("M1", 1), "current");
+      } else if ("all".equals(target)) {
+        replaceCandles(retrieveCandles("M", 500), "all");
       }
     } catch (Exception e) {
       loge("internal server error", e);
@@ -44,28 +38,56 @@ public class RefreshServlet extends HttpServlet {
     }
   }
 
-  private void updateData(String candle) throws Exception {
-    System.out.println("update candle: " + candle);
+  private String retrieveCandles(String granularity, int count) throws IOException {
+    URL url = new URL("https://api-fxpractice.oanda.com/v1/candles?instrument=EUR_USD&granularity=" + granularity + "&count=" + count);
+    HttpURLConnection connection = (HttpURLConnection) url.openConnection();
+    connection.setRequestMethod("GET");
+    connection.addRequestProperty("Content-Type", "application/x-www-form-urlencoded");
+    connection.addRequestProperty("X-Accept-Datetime-Format", "UNIX");
+    connection.addRequestProperty("Authorization", "Bearer 6fec4dc8bf5ed983d77b7783c027bdcd-d16c06e6db690a70916c04909fd51033");
+
+    return getJson(connection.getInputStream());
+  }
+
+  private void appendCandles(String candles, String record) throws Exception {
+    if (candles == null) { return; } else System.out.println("update candles: " + candles);
 
     DatastoreService datastore = DatastoreServiceFactory.getDatastoreService();
 
-    String time = candle.substring(0, candle.indexOf(','));
-    if (!time.contains("time")) { throw new Exception("unexpected candle format: " + candle); }
+    String time = candles.substring(0, candles.indexOf(','));
+    if (!time.contains("time")) { throw new Exception("unexpected candle format: " + candles); }
 
-    Key key = KeyFactory.createKey("mooncycle", "current");
+    Key key = KeyFactory.createKey("mooncycle", record);
     try {
-      String cycle = ((Text) datastore.get(key).getProperty("json")).getValue();
-      int index = cycle.indexOf(time);
-      Text newCycle = new Text((index > 0) ? cycle.substring(0, index) + candle + " ]" : cycle.substring(0, cycle.length() - 2) + ", " + candle + " ]");
+      String previousCandles = ((Text) datastore.get(key).getProperty("json")).getValue();
+      int index = previousCandles.indexOf(time);
+      String newCandles;
+
+      if (index > 0) {
+        newCandles = previousCandles.substring(0, index) + candles + " ]";
+      } else {
+        newCandles = previousCandles.substring(0, previousCandles.length() - 2) + ", " + candles + " ]";
+      }
 
       Entity entity = new Entity(key);
-      entity.setUnindexedProperty("json", newCycle);
+      entity.setUnindexedProperty("json", new Text(newCandles));
       datastore.put(entity);
     } catch (EntityNotFoundException e) {
       Entity entity = new Entity(key);
-      entity.setUnindexedProperty("json", new Text("[ " + candle + " ]"));
+      entity.setUnindexedProperty("json", new Text("[ " + candles + " ]"));
       datastore.put(entity);
     }
+  }
+
+  private void replaceCandles(String candles, String record) throws Exception {
+    if (candles == null) return;
+  
+    DatastoreService datastore = DatastoreServiceFactory.getDatastoreService();
+  
+    Key key = KeyFactory.createKey("mooncycle", record);
+    Entity entity = new Entity(key);
+    entity.setUnindexedProperty("json", new Text("[ " + candles + " ]"));
+    datastore.put(entity);
   }
 
   private String getJson(InputStream in) {
@@ -110,8 +132,8 @@ public class RefreshServlet extends HttpServlet {
 
   static {
     try {
-      System.setProperty("https.proxyHost", "proxy");
-      System.setProperty("https.proxyPort", "8080");
+//      System.setProperty("https.proxyHost", "proxy");
+//      System.setProperty("https.proxyPort", "8080");
       NaiveTrustSecurityProvider.install();
     } catch (Exception e) {
       loge("not a local environment", e);

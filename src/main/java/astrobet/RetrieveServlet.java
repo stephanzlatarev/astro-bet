@@ -19,7 +19,7 @@ public class RetrieveServlet extends HttpServlet {
   public void doGet(HttpServletRequest request, HttpServletResponse response) throws IOException {
     try {
       DatastoreService datastore = DatastoreServiceFactory.getDatastoreService();
-      String json = ((Text) datastore.get(KeyFactory.createKey("mooncycle", "current")).getProperty("json")).getValue();
+      String json = ((Text) datastore.get(KeyFactory.createKey("mooncycle", request.getParameter("window"))).getProperty("json")).getValue();
       response.getWriter().println(json);
     } catch (EntityNotFoundException e) {
       response.sendError(500, e.toString());

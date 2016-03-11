@@ -1,8 +1,13 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <cronentries>
   <cron>
-    <url>/refresh</url>
-    <description>Update database with quotes</description>
+    <url>/refresh?window=current</url>
+    <description>Real-time database update with quotes</description>
     <schedule>every 1 minutes</schedule>
+  </cron>
+  <cron>
+    <url>/refresh?window=all</url>
+    <description>Monthly database update with quotes</description>
+    <schedule>every monday 00:00</schedule>
   </cron>
 </cronentries>
