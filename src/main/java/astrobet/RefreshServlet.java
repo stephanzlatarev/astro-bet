@@ -14,7 +14,6 @@ import javax.servlet.http.HttpServletResponse;
 import com.google.appengine.api.datastore.DatastoreService;
 import com.google.appengine.api.datastore.DatastoreServiceFactory;
 import com.google.appengine.api.datastore.Entity;
-import com.google.appengine.api.datastore.EntityNotFoundException;
 import com.google.appengine.api.datastore.Key;
 import com.google.appengine.api.datastore.KeyFactory;
 import com.google.appengine.api.datastore.Text;
@@ -28,9 +27,10 @@ public class RefreshServlet extends HttpServlet {
       String target = request.getParameter("window");
 
       if ("current".equals(target)) {
-        appendCandles(retrieveCandles("M1", 1), "current");
+        storeCandlesList(retrieveCandlesList("H1", 672), "current");
       } else if ("all".equals(target)) {
-        replaceCandles(retrieveCandles("M", 500), "all");
+        storeCandlesList(retrieveCandlesList("M", 500), "all");
+        storeCandlesList(retrieveCandlesList("H1", 1344), "previous");
       }
     } catch (Exception e) {
       loge("internal server error", e);
@@ -38,7 +38,18 @@ public class RefreshServlet extends HttpServlet {
     }
   }
 
-  private String retrieveCandles(String granularity, int count) throws IOException {
+  private void storeCandlesList(String list, String name) throws Exception {
+    if (list == null) return;
+  
+    DatastoreService datastore = DatastoreServiceFactory.getDatastoreService();
+  
+    Key key = KeyFactory.createKey("mooncycle", name);
+    Entity entity = new Entity(key);
+    entity.setUnindexedProperty("json", new Text(list));
+    datastore.put(entity);
+  }
+
+  private String retrieveCandlesList(String granularity, int count) throws IOException {
     URL url = new URL("https://api-fxpractice.oanda.com/v1/candles?instrument=EUR_USD&granularity=" + granularity + "&count=" + count);
     HttpURLConnection connection = (HttpURLConnection) url.openConnection();
     connection.setRequestMethod("GET");
@@ -46,51 +57,10 @@ public class RefreshServlet extends HttpServlet {
     connection.addRequestProperty("X-Accept-Datetime-Format", "UNIX");
     connection.addRequestProperty("Authorization", "Bearer 6fec4dc8bf5ed983d77b7783c027bdcd-d16c06e6db690a70916c04909fd51033");
 
-    return getJson(connection.getInputStream());
+    return readCandlesList(connection.getInputStream());
   }
 
-  private void appendCandles(String candles, String record) throws Exception {
-    if (candles == null) { return; } else System.out.println("update candles: " + candles);
-
-    DatastoreService datastore = DatastoreServiceFactory.getDatastoreService();
-
-    String time = candles.substring(0, candles.indexOf(','));
-    if (!time.contains("time")) { throw new Exception("unexpected candle format: " + candles); }
-
-    Key key = KeyFactory.createKey("mooncycle", record);
-    try {
-      String previousCandles = ((Text) datastore.get(key).getProperty("json")).getValue();
-      int index = previousCandles.indexOf(time);
-      String newCandles;
-
-      if (index > 0) {
-        newCandles = previousCandles.substring(0, index) + candles + " ]";
-      } else {
-        newCandles = previousCandles.substring(0, previousCandles.length() - 2) + ", " + candles + " ]";
-      }
-
-      Entity entity = new Entity(key);
-      entity.setUnindexedProperty("json", new Text(newCandles));
-      datastore.put(entity);
-    } catch (EntityNotFoundException e) {
-      Entity entity = new Entity(key);
-      entity.setUnindexedProperty("json", new Text("[ " + candles + " ]"));
-      datastore.put(entity);
-    }
-  }
-
-  private void replaceCandles(String candles, String record) throws Exception {
-    if (candles == null) return;
-  
-    DatastoreService datastore = DatastoreServiceFactory.getDatastoreService();
-  
-    Key key = KeyFactory.createKey("mooncycle", record);
-    Entity entity = new Entity(key);
-    entity.setUnindexedProperty("json", new Text("[ " + candles + " ]"));
-    datastore.put(entity);
-  }
-
-  private String getJson(InputStream in) {
+  private String readCandlesList(InputStream in) {
     try {
       String json = "";
       BufferedReader reader = new BufferedReader(new InputStreamReader(in));
@@ -100,7 +70,9 @@ public class RefreshServlet extends HttpServlet {
       while ((line = reader.readLine()) != null) {
         if (line.contains("[")) {
           isReading = true;
+          json += "[ ";
         } else if (line.contains("]")) {
+          json += " ]";
           break;
         } else if (isReading) {
           json += line.trim();

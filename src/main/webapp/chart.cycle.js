@@ -1,29 +1,19 @@
-function CycleChart(placeholder) {
+function CycleChart(placeholder, cycle) {
 
   var chart = this;
 
   chart.placeholder = placeholder;
 
-  chart.getTime = function(day, hour) {
-    var offset = - new Date().getTimezoneOffset()
-    var d = new Date()
-    d.setDate(d.getDate() - d.getDay() + day)
-    d.setHours(hour)
-    d.setMinutes(offset)
-    return d.getTime()
-  }
-
-  chart.getWeekStart = function() {
-    return chart.getTime(0, 22)
-  }
-
-  chart.getWeekEnd = function() {
-    return chart.getTime(5, 22)
-  }
+  var xStart = new Date(cycle.newMoon)
+  xStart.setMinutes(- new Date().getTimezoneOffset())
+  xStart.setHours(0)
+  xStart.setDate(xStart.getDate() - xStart.getDay() + 1)
+  var xEnd = new Date(xStart.getTime())
+  xEnd.setDate(xEnd.getDate() + 28 + 5)
 
   chart.grid = {
-    xStart: chart.getWeekStart(),
-    xEnd: chart.getWeekEnd()
+    xStart: xStart.getTime(),
+    xEnd: xEnd.getTime()
   }
 
   chart.options = {
@@ -33,7 +23,7 @@ function CycleChart(placeholder) {
     },
     xaxis : {
       mode: 'time',
-      timeformat: "%H:%M %d.%m",
+      timeformat: "%d.%m",
       timezone: 'browser'
     },
     grid: {
@@ -46,18 +36,29 @@ function CycleChart(placeholder) {
         // Tokyo:    00:00 am - 09:00 am
         // London:   08:00 am - 05:00 pm
         // New York: 01:00 pm - 10:00 pm
-        for (var d = 1; d <= 5; d++) {
-          var londonOpen  = plot.pointOffset({ x: chart.getTime(d,  8), y: chart.grid.yMax })
-          var londonClose = plot.pointOffset({ x: chart.getTime(d, 17), y: chart.grid.yMin })
-          var newyorkOpen = plot.pointOffset({ x: chart.getTime(d, 13), y: chart.grid.yMax })
-          var newyorkClose = plot.pointOffset({ x: chart.getTime(d, 22), y: chart.grid.yMin })
 
-          ctx.beginPath();
-          ctx.rect(londonOpen.left, londonOpen.top, londonClose.left - londonOpen.left, londonClose.top - londonOpen.top);
-          ctx.stroke();
-          ctx.beginPath();
-          ctx.rect(newyorkOpen.left, newyorkOpen.top, newyorkClose.left - newyorkOpen.left, newyorkClose.top - newyorkOpen.top);
-          ctx.stroke();
+        var time = new Date(xStart.getTime())
+
+        while (time.getTime() < xEnd.getTime()) {
+          if ((time.getDay() >= 1) && (time.getDay() <= 5)) {
+            time.setHours(8)
+            var londonOpen  = plot.pointOffset({ x: time.getTime(), y: chart.grid.yMax })
+            time.setHours(17)
+            var londonClose = plot.pointOffset({ x: time.getTime(), y: chart.grid.yMin })
+            time.setHours(13)
+            var newyorkOpen = plot.pointOffset({ x: time.getTime(), y: chart.grid.yMax })
+            time.setHours(22)
+            var newyorkClose = plot.pointOffset({ x: time.getTime(), y: chart.grid.yMin })
+  
+            ctx.beginPath();
+            ctx.rect(londonOpen.left, londonOpen.top, londonClose.left - londonOpen.left, londonClose.top - londonOpen.top);
+            ctx.stroke();
+            ctx.beginPath();
+            ctx.rect(newyorkOpen.left, newyorkOpen.top, newyorkClose.left - newyorkOpen.left, newyorkClose.top - newyorkOpen.top);
+            ctx.stroke();
+          }
+
+          time.setDate(time.getDate() + 1)
         }
 
       }
@@ -73,12 +74,7 @@ function CycleChart(placeholder) {
   }
 
   chart.calibrateChart = function() {
-    var tickSize = Math.ceil(5000 / chart.placeholder.innerWidth())
-    tickSize = Math.ceil(24 / Math.floor(24 / tickSize))
-
-    chart.options.xaxis.tickSize = [ tickSize, 'hour']
-    chart.options.xaxis.min = Math.floor(chart.grid.xStart / 3600000) * 3600000;
-    chart.options.xaxis.max = Math.floor(chart.grid.xEnd / 3600000) * 3600000;
+    chart.options.xaxis.tickSize = [ 7, 'day']
   }
 
   chart.calibrateGrid = function() {
@@ -126,7 +122,7 @@ function CycleChart(placeholder) {
   //---------------------
 
   $.ajax({
-    url: "/retrieve?window=current",
+    url: "/retrieve?window=" + cycle.name,
     dataType: "json"
   }).done(function(d) {
     var data = []

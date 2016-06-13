@@ -7,24 +7,32 @@
     <script src="jquery.flot.js"></script>
     <script src="jquery.flot.time.js"></script>
     <script src="chart.all.js"></script>
-    <script src="chart.current.js"></script>
+    <script src="chart.cycle.js"></script>
     <style type="text/css">
       html,body { height: 100%; margin: 0px; padding: 0px; overflow: hidden; }
-      #chartall { height: 50% }
-      #chartcurrent { height: 50% }
+      #chartall { height: 33% }
+      #chartprevious { height: 33% }
+      #chartcurrent { height: 33% }
     </style>
   </head>
 
+  <!--
+    New Moon          First Quarter     Full Moon         Third Quarter     Next Moon
+    Feb. 8 Mo. 16:40  Feb. 15 Mo. 09:47 Feb. 22 Mo. 20:20 Mar. 2 We. 01:12  Mar. 9 We. 03:55
+    Mar. 9 We. 03:55  Mar. 15 Tu. 19:04 Mar. 23 We. 14:01 Mar. 31 Th. 18:18 Apr. 7 Th. 14:25
+  -->
 
   <script type="text/javascript">
     $(document).ready(function() {
       new AllChart($("#chartall"))
-      new CycleChart($("#chartcurrent"))
+      new CycleChart($("#chartprevious"), { name: "previous", newMoon: new Date(2016, 5-1, 6, 00, 00).getTime(), nextMoon: new Date(2016, 6-1, 4, 00, 00).getTime() })
+      new CycleChart($("#chartcurrent"), { name: "current", newMoon: new Date(2016, 6-1, 4, 00, 00).getTime(), nextMoon: new Date(2016, 7-1, 4, 00, 00).getTime() })
     })
   </script>
 
   <body>
     <div id="chartall"></div>
+    <div id="chartprevious"></div>
     <div id="chartcurrent"></div>
   </body>
 </html>
